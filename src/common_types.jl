@@ -1,11 +1,4 @@
 
-__precompile__()
-
-module TrussMorph
-
-# dependencies
-
-# abstract types
 mutable struct MaterialProperties
     E::Float64 # Young's modulus
     G::Float64 # Shear Modulus
@@ -26,10 +19,3 @@ mutable struct Truss
     S::Matrix{Int}     # fixities x 4 matrix
     mp::MaterialProperties
 end
-# exported APIs
-# export f
-
-include("json_parser.jl")
-# include(".jl")
-
-end # module

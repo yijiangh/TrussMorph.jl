@@ -1,0 +1,27 @@
+{
+  "applied_shape_file": "2D_truss.json",
+  "dimension": 2,
+  "force_unit": "kN",
+  "moment_unit": "kN-m",
+  "include_self_weight": false,
+  "point_load_list": [
+    {
+      "applied_node_id": 1,
+      "Fx": 0.0,
+      "Fy": -10.0,
+      "Fz": 0.0,
+      "Mx": 0.0,
+      "My": 0.0,
+      "Mz": 0.0
+    },
+    {
+      "applied_node_id": 2,
+      "Fx": 0.0,
+      "Fy": -10.0,
+      "Fz": 0.0,
+      "Mx": 0.0,
+      "My": 0.0,
+      "Mz": 0.0
+    }
+  ]
+}

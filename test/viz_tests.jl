@@ -11,7 +11,7 @@ A = ones(size(truss.T,1))
 
 scene = Scene()
 draw_truss!(scene, truss, A, supp_scale=0.2)
-draw_load!(scene, truss, load, load_scale=0.01)
+draw_load!(scene, truss, load, load_scale=0.05)
 
 # display(scene)
 

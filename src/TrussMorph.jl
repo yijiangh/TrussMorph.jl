@@ -4,11 +4,16 @@ __precompile__()
 module TrussMorph
 
 # dependencies
+using JSON
+using Makie
+using LinearAlgebra
 
 # abstract types
 
 # exported APIs
-export parse_truss_json, draw_truss!, draw_load!
+export parse_truss_json, parse_load_json, draw_truss!, draw_load!
+
+# export assemble_global_stiffness_matrix
 
 include("common_types.jl")
 include("json_parser.jl")

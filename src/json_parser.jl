@@ -1,5 +1,4 @@
 import JSON
-include("common_types.jl")
 
 function parse_truss_json(file_path::String)
     data = Dict()
@@ -47,8 +46,39 @@ function parse_truss_json(file_path::String)
 
     # get element node ids
     for i=1:n_elements
-        T[i,:] = data["element_list"][i]["end_node_ids"]'
+        T[i,:] = (data["element_list"][i]["end_node_ids"] .+ 1)'
     end
 
     return Truss(X, T, S, mp)
+end
+
+function parse_load_json(file_path::String)
+    data = Dict()
+    open(file_path, "r") do f
+        data_txt = read(f, String)
+        data = JSON.parse(data_txt)
+    end
+
+    dim = data["dimension"]
+    n_load_nodes = length(data["point_load_list"])
+
+    if 2 == dim
+        node_dof = 3
+    else
+        node_dof = 6
+    end
+
+    Load = zeros(n_load_nodes, 1+node_dof)
+    for i=1:n_load_nodes
+        Load[i,1] = data["point_load_list"][i]["applied_node_id"] + 1
+        if 2 == dim
+            Load[i,2] = data["point_load_list"][i]["Fx"]
+            Load[i,3] = data["point_load_list"][i]["Fy"]
+            Load[i,4] = data["point_load_list"][i]["Mz"]
+        end
+    end
+
+    @assert(n_load_nodes > 0)
+    return Load
+    # TODO: include_self_weight
 end

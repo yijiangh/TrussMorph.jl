@@ -1,4 +1,5 @@
-using LinearAlgebra: norm
+using TrussMorph: SectionProperties, MaterialProperties
+using LinearAlgebra: norm, cholesky, I
 using SparseArrays
 
 function local_coord_rotation(u::Vector{Float64}, v::Vector{Float64})
@@ -21,24 +22,45 @@ Return: 6 x 6 matrix K_le (local elemental)
 
 Note: only support 2d right now.
 """
-function local_stiffness_matrix(L::Float64, E::Float64, A::Float64)
-    K_le = zeros(Float64, 2, 2)
-    K_le[1,1] = 1.0
-    K_le[1,2] = -1.0
-    K_le[2,1] = -1.0
-    K_le[2,2] = 1.0
-    K_le *= E * A / L
+function local_stiffness_matrix(L::Float64, mp::MaterialProperties, sp::SectionProperties)
+    E = mp.E
+    G = mp.G
+    A = sp.A
+    I = sp.Iz
+    fs = 1.0 # shear deformation const
+    beta = (12*E*I*fs)/(G*A*L^2)
+
+    K_beam = zeros(Float64, 4, 4)
+    K_beam[1,2] = 6*L;
+    K_beam[1,3] = -12;
+    K_beam[1,4] = 6*L;
+    K_beam[2,3] = -6*L;
+    K_beam[2,4] = L^2*(2-beta);
+    K_beam[3,4] = -6*L;
+    K_beam = K_beam' + K_beam;
+
+    K_beam += Diagonal([12, L^2*(4+beta), 12, L^2*(4+beta)])
+    K_beam *= (E*I)/(L^3*(1+beta))
+
+    K_le = zeros(Float64, 6, 6)
+    K_le[1,1] = E * A / L
+    K_le[1,4] = -E * A / L
+    K_le[4,1] = -E * A / L
+    K_le[4,4] = E * A / L
+    K_le[2:3,2:3] = K_beam[1:2,1:2];
+    K_le[2:3,5:6] = K_beam[1:2,3:4];
+    K_le[5:6,2:3] = K_beam[3:4,1:2];
+    K_le[5:6,5:6] = K_beam[3:4,3:4];
     return K_le
 end
 
 # TODO: can be optimized using symbolic substitution, only X is changing here
-# NOTE: A might be set as ones, if we are using ∑ f_e * l_e formula?
+# NOTE: r might be set to be uniform, if we are using ∑ f_e * l_e formula?
 function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
-                                          A::Vector{Float64}, E::Float64,
+                                          r::Vector{Float64}, mp::MaterialProperties,
                                           node_dof::Int, full_node_dof::Int)
     n_elements = size(T,1)
     n_nodes = size(X,1)
-    # dimension get from X
 
     # element -> dof id map
     sys_dof::Int = node_dof * n_nodes
@@ -51,24 +73,35 @@ function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
         id_map[i, node_dof+1:2*node_dof] = vid * node_dof * ones(node_dof) - back_dof_lin
     end
 
+    # cross sec properties
+    sp_vec = Array{SectionProperties}(undef, n_elements)
+    for e=1:n_elements
+        sp_vec[e] = compute_round_section_properties(r[e])
+    end
+
     # for elemental force calc
     KR_es = Array{Matrix{Float64},1}(undef, n_elements)
 
-    # truss
-    ex_id = [1, 4]
-    xy_id = [1, 2, 4, 5]
+    if 2 == node_dof
+        ex_id = [1, 4]
+        xy_id = [1, 2, 4, 5]
+    else
+        ex_id = collect(1:2*node_dof)
+        xy_id = collect(1:2*node_dof)
+    end
 
+    # TODO: array size node_dof^2 * n_elements
     I = Int[]
     J = Int[]
     V = Float64[]
-    # K ∈ 2 n_node x 2 n_node
+    # K ∈ (node_dof*n_node)^2
     for e=1:n_elements
         u = X[T[e,1],:]
         v = X[T[e,2],:]
         L = norm(u - v)
 
         # element local stiffness matrix
-        K_le = local_stiffness_matrix(L, E, A[e])
+        K_le = local_stiffness_matrix(L, mp, sp_vec[e])
 
         # local -> global rotation matrix
         R_b = local_coord_rotation(u, v)
@@ -77,7 +110,7 @@ function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
             R[k*3-3+1:k*3, k*3-3+1:k*3] = R_b
         end
 
-        K_Ge = R[ex_id, xy_id]' * K_le * R[ex_id, xy_id]
+        K_Ge = R[ex_id, xy_id]' * K_le[ex_id, ex_id] * R[ex_id, xy_id]
         KR_es[e] = K_le * R[ex_id, xy_id]
 
         for i=1:2*node_dof
@@ -114,7 +147,7 @@ function dof_permutation(S::Matrix{Int}, n_nodes::Int, node_dof::Int)
     for i=1:n_fix
         v_id = Int.(S[i,1])
         full_dof_fix[node_dof*(v_id-1)+1 : node_dof*v_id] = S[i, 2:1+node_dof]
-        #TODO: node_dof here might be incompatible
+        #TODO: 3D node_dof here might be incompatible, 2D is okay
     end
 
     perm = zeros(Int, sys_dof)
@@ -135,14 +168,17 @@ function dof_permutation(S::Matrix{Int}, n_nodes::Int, node_dof::Int)
     return perm, perm_spm, n_dof_free
 end
 
-function weight_calculation(X::Matrix{Float64}, A::Vector{Float64},
-    T::Matrix{Int64}, F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, E::Float64)
+function weight_calculation(X::Matrix{Float64}, r::Vector{Float64},
+    T::Matrix{Int64},
+    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int},
+    n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties)
+
     # assemble stiffness matrix
     n_v = size(X, 1)
     n_e = size(T, 1)
     sys_dof = n_v * node_dof
 
-    K, KR_es, id_map = assemble_global_stiffness_matrix(X, T, A, E, node_dof, full_node_dof)
+    K, KR_es, id_map = assemble_global_stiffness_matrix(X, T, r, mp, node_dof, full_node_dof)
     K_perm = perm * K * perm'
     K_mm = K_perm[1:n_dof_free, 1:n_dof_free]
 
@@ -159,12 +195,21 @@ function weight_calculation(X::Matrix{Float64}, A::Vector{Float64},
     # TODO: buckling sizing is ignored for now
     # calculate ∑ F_e * l_e
     weight = 0.0
-    e_react_dof = 1
+    if node_dof == 2
+        e_react_dof = 1 # truss
+    else
+        e_react_dof = 3 # frame
+    end
+
     eF = zeros(n_e, e_react_dof*2)
     for e=1:n_e
         eF[e,:] = KR_es[e] * U[id_map[e,:]]
         eL = norm(X[T[e,1], :] - X[T[e,2], :])
         weight += abs(eF[e,:][1]) * eL
     end
+
+    # @show eF
+    # @show U
+
     return weight
 end

@@ -41,7 +41,9 @@ function draw_load!(scene, truss::Truss, load::Matrix{Float64}; load_scale::Floa
             linecolor = :pink, arrowcolor = :pink, limits = limits)
 end
 
-function draw_deformed!(scene, truss::Truss, U::Vector{Float64}, node_dof::Int; line_width=10)
+function draw_deformed!(scene, truss::Truss, U::Vector{Float64}, node_dof::Int;
+    line_width::Float64=10, deform_scale::Float64=5.0)
+
     n_v = size(truss.X, 1)
     n_e = size(truss.T, 1)
     a = ones(Float64, 2*n_e)
@@ -56,7 +58,8 @@ function draw_deformed!(scene, truss::Truss, U::Vector{Float64}, node_dof::Int; 
     node_U = reshape(U, (node_dof, Int.(length(U)/node_dof)))'
     DX = truss.X[seg_ids, 1] + node_U[seg_ids, 1]
     DY = truss.X[seg_ids, 2] + node_U[seg_ids, 2]
-    linesegments!(scene, DX, DY, linewidth = a,
+    linesegments!(scene, DX .* deform_scale, DY .* deform_scale,
+                  linewidth = a,
                   color = :blue,
                   limits = limits,
                   axis = (names = (axisnames = ("x", "y"),),

@@ -168,48 +168,65 @@ function dof_permutation(S::Matrix{Int}, n_nodes::Int, node_dof::Int)
     return perm, perm_spm, n_dof_free
 end
 
-function weight_calculation(X::Matrix{Float64}, r::Vector{Float64},
-    T::Matrix{Int64},
-    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int},
-    n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties)
+function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, T::Matrix{Int64},
+    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties, design_var_id::Vector{Int})::Function
 
     # assemble stiffness matrix
-    n_v = size(X, 1)
+    n_v = size(X_full, 1)
     n_e = size(T, 1)
     sys_dof = n_v * node_dof
 
-    K, KR_es, id_map = assemble_global_stiffness_matrix(X, T, r, mp, node_dof, full_node_dof)
-    K_perm = perm * K * perm'
-    K_mm = K_perm[1:n_dof_free, 1:n_dof_free]
+    # split design variable + the rest
+    X_template = copy(X_full)
+    design_var_id_map = zeros(Int, length(design_var_id), 2)
+    for i=1:length(design_var_id)
+        design_var_id_map[i,1] = Int.((design_var_id[i] + design_var_id[i]%2) / 2)
+        design_var_id_map[i,2] = 2 - design_var_id[i]%2
+        X_template[design_var_id_map[i,1], design_var_id_map[i,2]] = 0
+    end
+    # @show design_var_id
+    # @show X_template
+    # @show design_var_id_map
 
-    # solve linear system
-    # U_m = K_mm\F_perm_m
-    K_mm = (K_mm + K_mm')/2
-    Kpf = cholesky(K_mm)
-    U_m = Kpf\F_perm_m
+    function calc_weight(X_var::Vector{Float64})
+        X_new = copy(X_template) #this is bad
+        for i=1:length(design_var_id)
+            X_new[design_var_id_map[i,1], design_var_id_map[i,2]] = X_var[i]
+        end
 
-    # U_I, U_V = findnz(U_m)
-    U_perm = vcat(U_m, zeros(sys_dof - n_dof_free))
-    U = perm' * U_perm
+        K, KR_es, id_map = assemble_global_stiffness_matrix(X_new, T, r, mp, node_dof, full_node_dof)
+        K_perm = perm * K * perm'
+        K_mm = K_perm[1:n_dof_free, 1:n_dof_free]
 
-    # TODO: buckling sizing is ignored for now
-    # calculate ∑ F_e * l_e
-    weight = 0.0
-    if node_dof == 2
-        e_react_dof = 1 # truss
-    else
-        e_react_dof = 3 # frame
+        # solve linear system
+        # U_m = K_mm\F_perm_m
+        K_mm = (K_mm + K_mm')/2
+        Kpf = cholesky(K_mm)
+        U_m = Kpf\F_perm_m
+
+        # U_I, U_V = findnz(U_m)
+        U_perm = vcat(U_m, zeros(sys_dof - n_dof_free))
+        U = perm' * U_perm
+
+        # TODO: buckling sizing is ignored for now
+        # calculate ∑ F_e * l_e
+        weight = 0.0
+        if node_dof == 2
+            e_react_dof = 1 # truss
+        else
+            e_react_dof = 3 # frame
+        end
+
+        eF = zeros(n_e, e_react_dof*2)
+        for e=1:n_e
+            eF[e,:] = KR_es[e] * U[id_map[e,:]]
+            eL = norm(X_new[T[e,1], :] - X_new[T[e,2], :])
+            weight += abs(eF[e,:][1]) * eL
+        end
+        # @show eF
+        # @show U
+        return weight
     end
 
-    eF = zeros(n_e, e_react_dof*2)
-    for e=1:n_e
-        eF[e,:] = KR_es[e] * U[id_map[e,:]]
-        eL = norm(X[T[e,1], :] - X[T[e,2], :])
-        weight += abs(eF[e,:][1]) * eL
-    end
-
-    # @show eF
-    # @show U
-
-    return weight
+    return calc_weight
 end

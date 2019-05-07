@@ -3,7 +3,7 @@ using SparseArrays
 
 function local_coord_rotation(u::Vector{Float64}, v::Vector{Float64})
     local L = norm(u - v)
-    c = (u - v) ./ L
+    c = (v - u) ./ L
     R = zeros(Float64, 3, 3)
     R[1,1] = c[1]
     R[1,2] = c[2]
@@ -25,9 +25,9 @@ function local_stiffness_matrix(L::Float64, E::Float64, A::Float64)
     K_le = zeros(Float64, 2, 2)
     K_le[1,1] = 1.0
     K_le[1,2] = -1.0
-    K_le[2,1] = 1.0
-    K_le[2,2] = -1.0
-    K_le .*= E * A / L
+    K_le[2,1] = -1.0
+    K_le[2,2] = 1.0
+    K_le *= E * A / L
     return K_le
 end
 
@@ -96,7 +96,7 @@ function assemble_load_vector(Load::Matrix{Float64}, n_nodes::Int, node_dof::Int
     for i=1:n_load_nodes
         v_id = Int.(Load[i,1])
         append!(I, node_dof*(v_id-1)+1 : node_dof*v_id)
-        append!(V, Load[2:1:node_dof+1])
+        append!(V, Load[i, 2:1:node_dof+1])
     end
     return sparsevec(I, V, sys_dof)
 end

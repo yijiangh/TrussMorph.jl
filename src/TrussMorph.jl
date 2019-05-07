@@ -11,7 +11,7 @@ using LinearAlgebra
 # abstract types
 
 # exported APIs
-export parse_truss_json, parse_load_json, draw_truss!, draw_load!
+export parse_truss_json, parse_load_json, draw_truss!, draw_load!, draw_deformed!
 
 # export assemble_global_stiffness_matrix
 

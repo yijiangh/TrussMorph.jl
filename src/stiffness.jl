@@ -135,13 +135,36 @@ function dof_permutation(S::Matrix{Int}, n_nodes::Int, node_dof::Int)
     return perm, perm_spm, n_dof_free
 end
 
-function weight_calculation()
+function weight_calculation(X::Matrix{Float64}, A::Vector{Float64},
+    T::Matrix{Int64}, F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, E::Float64)
     # assemble stiffness matrix
+    n_v = size(X, 1)
+    n_e = size(T, 1)
+    sys_dof = n_v * node_dof
+
+    K, KR_es, id_map = assemble_global_stiffness_matrix(X, T, A, E, node_dof, full_node_dof)
+    K_perm = perm * K * perm'
+    K_mm = K_perm[1:n_dof_free, 1:n_dof_free]
 
     # solve linear system
+    # U_m = K_mm\F_perm_m
+    K_mm = (K_mm + K_mm')/2
+    Kpf = cholesky(K_mm)
+    U_m = Kpf\F_perm_m
+
+    # U_I, U_V = findnz(U_m)
+    U_perm = vcat(U_m, zeros(sys_dof - n_dof_free))
+    U = perm' * U_perm
 
     # TODO: buckling sizing is ignored for now
     # calculate ∑ F_e * l_e
-
-    # return W
+    weight = 0.0
+    e_react_dof = 1
+    eF = zeros(n_e, e_react_dof*2)
+    for e=1:n_e
+        eF[e,:] = KR_es[e] * U[id_map[e,:]]
+        eL = norm(X[T[e,1], :] - X[T[e,2], :])
+        weight += abs(eF[e,:][1]) * eL
+    end
+    return weight
 end

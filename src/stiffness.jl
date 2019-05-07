@@ -51,6 +51,9 @@ function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
         id_map[i, node_dof+1:2*node_dof] = vid * node_dof * ones(node_dof) - back_dof_lin
     end
 
+    # for elemental force calc
+    KR_es = Array{Matrix{Float64},1}(undef, n_elements)
+
     # truss
     ex_id = [1, 4]
     xy_id = [1, 2, 4, 5]
@@ -75,6 +78,7 @@ function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
         end
 
         K_Ge = R[ex_id, xy_id]' * K_le * R[ex_id, xy_id]
+        KR_es[e] = K_le * R[ex_id, xy_id]
 
         for i=1:2*node_dof
             for j=1:2*node_dof
@@ -84,7 +88,7 @@ function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
             end
         end
     end
-    return sparse(I, J, V, sys_dof, sys_dof)
+    return sparse(I, J, V, sys_dof, sys_dof), KR_es, id_map
 end
 
 function assemble_load_vector(Load::Matrix{Float64}, n_nodes::Int, node_dof::Int)

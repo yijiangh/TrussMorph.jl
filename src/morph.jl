@@ -35,18 +35,28 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
             Float64.(i / (path_disc + 1)) * X1_var
     end
 
+    parm_smooth = 100.0
+    parm_weight = 1.0
+
     function path_energy(Xpath::Vector{Float64})
-        Xmat = vcat(X0_var, reshape(Xpath, (var_chuck, Int.(length(Xpath)/var_chuck))), X1_var)
+        Xmat = vcat(X0_var', reshape(Xpath, (var_chuck, path_disc))', X1_var')
         dXpath_dt = Xmat[2:end, :] - Xmat[1:end-1, :]
         path_weight = 0
         for i=1:path_disc
-            path_weight += weight_fn(Xm[1+i,:])
+            path_weight += weight_fn(Xmat[1+i,:])
         end
-        return sum(dXpath_dt.^2) + path_weight
+        return parm_smooth * sum(dXpath_dt.^2) + parm_weight * path_weight
     end
 
     # run opt
-    X_var_star = Xpath0
+    res = Optim.optimize(path_energy, Xpath0, LBFGS())
+    @show summary(res)
+    X_var_star = Optim.minimizer(res)
+    @show Optim.minimum(res)
+
+    # X_var_star = Xpath0
+    @show path_energy(Xpath0)
+
     X_var_star = reshape(X_var_star, (var_chuck, path_disc))'
 
     X_template = copy(t0.X)

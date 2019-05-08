@@ -1,6 +1,7 @@
 using Makie
 
-function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, area::Vector{Float64}; line_width=10, draw_supp=true, supp_scale=0.1)
+function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, area::Vector{Float64}; line_width::Float64=10.0, draw_supp::Bool=true, supp_scale::Float64=0.1, color=:black)
+
     @assert(size(T, 1) == length(area))
     a = reshape([area area]', 2*length(area))
     a ./= maximum(a)
@@ -13,7 +14,7 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
                    max_lim, max_lim)
 
     linesegments!(scene, X[seg_ids, 1], X[seg_ids, 2], linewidth = a,
-                  color = :black,
+                  color = color,
                   limits = limits,
                   axis = (names = (axisnames = ("x", "y"),),
                           grid = (linewidth = (1, 1),),

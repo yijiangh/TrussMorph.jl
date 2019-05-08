@@ -7,9 +7,11 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
     a ./= maximum(a)
     a .*= line_width
 
-    seg_ids = reshape([T[:,1] T[:,2]], length(T[:,1])+length(T[:,2]))
-    max_lim = max(maximum(X[:,1]) - minimum(X[:,1]),
-                  maximum(X[:,2]) - minimum(X[:,2]))
+    # seg_ids = reshape([T[:,1] T[:,2]], length(T[:,1])+length(T[:,2]))
+    seg_ids = reshape(T', prod(size(T)))
+    max_xlim = maximum(X[:,1]) - minimum(X[:,1])
+    max_ylim = maximum(X[:,2]) - minimum(X[:,2])
+    max_lim = max(max_xlim, max_ylim)
     limits = FRect(minimum(X[:,1]), minimum(X[:,2]),
                    max_lim, max_lim)
 
@@ -33,8 +35,9 @@ end
 
 function draw_load!(scene, truss::Truss, load::Matrix{Float64}; load_scale::Float64=0.1)
     fix_ids = (Int).(load[:,1])
-    max_lim = max(maximum(truss.X[:,1]) - minimum(truss.X[:,1]),
-                  maximum(truss.X[:,2]) - minimum(truss.X[:,2]))
+    max_xlim = maximum(truss.X[:,1]) - minimum(truss.X[:,1])
+    max_ylim = maximum(truss.X[:,2]) - minimum(truss.X[:,2])
+    max_lim = max(max_xlim, max_ylim)
     limits = FRect(minimum(truss.X[:,1]), minimum(truss.X[:,2]),
                    max_lim, max_lim)
     arrows!(scene, truss.X[fix_ids, 1], truss.X[fix_ids, 2],

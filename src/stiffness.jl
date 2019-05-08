@@ -169,7 +169,7 @@ function dof_permutation(S::Matrix{Int}, n_nodes::Int, node_dof::Int)
 end
 
 function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, T::Matrix{Int64},
-    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties, design_var_id::Vector{Int})::Function
+    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties, design_var_id::Vector{Int}; opt_compliance::Bool=false)::Function
 
     # assemble stiffness matrix
     n_v = size(X_full, 1)
@@ -201,11 +201,20 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
         # solve linear system
         # U_m = K_mm\F_perm_m
         K_mm = (K_mm + K_mm')/2
-        Kpf = cholesky(K_mm)
+        Kpf = cholesky(K_mm, check=false)
+        if !LinearAlgebra.issuccess(Kpf)
+            return 1e10
+        end
         U_m = Kpf\F_perm_m
 
         # U_I, U_V = findnz(U_m)
         U_perm = vcat(U_m, zeros(sys_dof - n_dof_free))
+
+        # # compliance
+        if opt_compliance
+            return F_perm_m' * U_m
+        end
+
         U = perm' * U_perm
 
         # TODO: buckling sizing is ignored for now

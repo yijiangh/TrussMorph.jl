@@ -3,7 +3,7 @@ tm = TrussMorph
 using Optim
 
 function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
-    node_dof::Int, full_node_dof::Int; path_disc::Int=5)
+    node_dof::Int, full_node_dof::Int, design_var_ids::Vector{Int}; path_disc::Int=5, parm_smooth::Float64=100.0, parm_weight::Float64=50.0)
 
     @assert(size(t0.X, 1) == size(t1.X, 1))
     @assert(t0.T == t1.T)
@@ -19,7 +19,6 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
     F_perm = perm * F
     F_m = Array(F_perm[1:n_dof_free])
 
-    design_var_ids = [4, 6]
     var_chuck = length(design_var_ids)::Int
     X0_var = reshape(t0.X', prod(size(t0.X)))[design_var_ids]
     X1_var = reshape(t1.X', prod(size(t1.X)))[design_var_ids]
@@ -35,9 +34,6 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
             Float64.(i / (path_disc + 1)) * X1_var
     end
 
-    parm_smooth = 100.0
-    parm_weight = 1.0
-
     function path_energy(Xpath::Vector{Float64})
         Xmat = vcat(X0_var', reshape(Xpath, (var_chuck, path_disc))', X1_var')
         dXpath_dt = Xmat[2:end, :] - Xmat[1:end-1, :]
@@ -46,18 +42,21 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
             path_weight += weight_fn(Xmat[1+i,:])
         end
         return parm_smooth * sum(dXpath_dt.^2) + parm_weight * path_weight
+        # return path_weight
+        # return sum(dXpath_dt.^2)
+        # TODO: try compliance
     end
 
     # run opt
     res = Optim.optimize(path_energy, Xpath0, LBFGS())
     @show summary(res)
-    X_var_star = Optim.minimizer(res)
+    X_var_star_vec = Optim.minimizer(res)
     @show Optim.minimum(res)
 
     # X_var_star = Xpath0
     @show path_energy(Xpath0)
 
-    X_var_star = reshape(X_var_star, (var_chuck, path_disc))'
+    X_var_star = reshape(X_var_star_vec, (var_chuck, path_disc))'
 
     X_template = copy(t0.X)
     dim = size(t0.X,2)
@@ -71,20 +70,49 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
     morph_path = Array{Matrix{Float64}}(undef, path_disc + 2)
     morph_path[1] = t0.X
     morph_path[end] = t1.X
-    # @show morph_path
-    # @show design_var_id_map
-    # @show X_var_star
 
     for i=2:path_disc+1
         morph_path[i] = copy(X_template)
         for j=1:var_chuck
-            # @show design_var_id_map[j,1]
-            # @show design_var_id_map[j,2]
-            # @show X_var_star[i-1, j]
-
             morph_path[i][design_var_id_map[j,1], design_var_id_map[j,2]] = X_var_star[i-1, j]
         end
     end
 
-    return morph_path
+    # function map_full_X_to_design_vars(origX::Matrix{Float64})::Vector{Float64}
+    #     return reshape(origX', prod(size(origX)))[design_var_ids]
+    # end
+
+    ptwise_smoothness_energy = Float64[]
+    ptwise_weight_energy = Float64[]
+    ptwise_total_energy = Float64[]
+    push!(ptwise_smoothness_energy, sum((X0_var - X_var_star[1,:]).^2))
+    push!(ptwise_weight_energy, weight_fn(X0_var))
+    push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
+                               parm_weight * ptwise_weight_energy[end])
+
+    for i=1:path_disc
+        push!(ptwise_weight_energy, weight_fn(X_var_star[i, :]))
+        if 1 == i
+            prevX_var = X0_var
+        else
+            prevX_var = X_var_star[i-1,:]
+        end
+        if path_disc == i
+            nextX_var = X1_var
+        else
+            nextX_var = X_var_star[i+1,:]
+        end
+        push!(ptwise_smoothness_energy, sum((X_var_star[i, :] - prevX_var).^2) +
+                                        sum((X_var_star[i, :] - nextX_var).^2))
+        push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
+                                   parm_weight * ptwise_weight_energy[end])
+    end
+
+    push!(ptwise_smoothness_energy, sum((X1_var - X_var_star[end,:]).^2))
+    push!(ptwise_weight_energy, weight_fn(X1_var))
+    push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
+                               parm_weight * ptwise_weight_energy[end])
+
+    # return intial morph path and energy as a comparision
+    return morph_path, ptwise_smoothness_energy, ptwise_weight_energy, ptwise_total_energy, [parm_smooth, parm_weight]
 end

@@ -51,12 +51,13 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
     res = Optim.optimize(path_energy, Xpath0, LBFGS())
     @show summary(res)
     X_var_star_vec = Optim.minimizer(res)
-    @show Optim.minimum(res)
+    @show opt_sumE = Optim.minimum(res)
 
     # X_var_star = Xpath0
-    @show path_energy(Xpath0)
+    @show init_sumE = path_energy(Xpath0)
 
     X_var_star = reshape(X_var_star_vec, (var_chuck, path_disc))'
+    X_var_init = reshape(Xpath0, (var_chuck, path_disc))'
 
     X_template = copy(t0.X)
     dim = size(t0.X,2)
@@ -78,41 +79,58 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
         end
     end
 
+    init_morph_path = Array{Matrix{Float64}}(undef, path_disc + 2)
+    init_morph_path[1] = t0.X
+    init_morph_path[end] = t1.X
+
+    for i=2:path_disc+1
+        init_morph_path[i] = copy(X_template)
+        for j=1:var_chuck
+            init_morph_path[i][design_var_id_map[j,1], design_var_id_map[j,2]] = X_var_init[i-1, j]
+        end
+    end
+
     # function map_full_X_to_design_vars(origX::Matrix{Float64})::Vector{Float64}
     #     return reshape(origX', prod(size(origX)))[design_var_ids]
     # end
-
-    ptwise_smoothness_energy = Float64[]
-    ptwise_weight_energy = Float64[]
-    ptwise_total_energy = Float64[]
-    push!(ptwise_smoothness_energy, sum((X0_var - X_var_star[1,:]).^2))
-    push!(ptwise_weight_energy, weight_fn(X0_var))
-    push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
-                               parm_weight * ptwise_weight_energy[end])
-
-    for i=1:path_disc
-        push!(ptwise_weight_energy, weight_fn(X_var_star[i, :]))
-        if 1 == i
-            prevX_var = X0_var
-        else
-            prevX_var = X_var_star[i-1,:]
-        end
-        if path_disc == i
-            nextX_var = X1_var
-        else
-            nextX_var = X_var_star[i+1,:]
-        end
-        push!(ptwise_smoothness_energy, sum((X_var_star[i, :] - prevX_var).^2) +
-                                        sum((X_var_star[i, :] - nextX_var).^2))
+    function cal_ptwise_energies(X_var_vec::Vector{Float64})
+        X_var = reshape(X_var_vec, (var_chuck, path_disc))'
+        ptwise_smoothness_energy = Float64[]
+        ptwise_weight_energy = Float64[]
+        ptwise_total_energy = Float64[]
+        push!(ptwise_smoothness_energy, sum((X0_var - X_var[1,:]).^2))
+        push!(ptwise_weight_energy, weight_fn(X0_var))
         push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
                                    parm_weight * ptwise_weight_energy[end])
+
+        for i=1:path_disc
+            push!(ptwise_weight_energy, weight_fn(X_var[i, :]))
+            if 1 == i
+                prevX_var = X0_var
+            else
+                prevX_var = X_var[i-1,:]
+            end
+            if path_disc == i
+                nextX_var = X1_var
+            else
+                nextX_var = X_var[i+1,:]
+            end
+            push!(ptwise_smoothness_energy, sum((X_var[i, :] - prevX_var).^2) +
+                                            sum((X_var[i, :] - nextX_var).^2))
+            push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
+                                       parm_weight * ptwise_weight_energy[end])
+        end
+
+        push!(ptwise_smoothness_energy, sum((X1_var - X_var[end,:]).^2))
+        push!(ptwise_weight_energy, weight_fn(X1_var))
+        push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
+                                   parm_weight * ptwise_weight_energy[end])
+        return ptwise_smoothness_energy, ptwise_weight_energy, ptwise_total_energy
     end
 
-    push!(ptwise_smoothness_energy, sum((X1_var - X_var_star[end,:]).^2))
-    push!(ptwise_weight_energy, weight_fn(X1_var))
-    push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
-                               parm_weight * ptwise_weight_energy[end])
+    opt_sE, opt_wE, opt_totE = cal_ptwise_energies(X_var_star_vec)
+    init_sE, init_wE, init_totE = cal_ptwise_energies(Xpath0)
 
     # return intial morph path and energy as a comparision
-    return morph_path, ptwise_smoothness_energy, ptwise_weight_energy, ptwise_total_energy, [parm_smooth, parm_weight]
+    return morph_path, init_morph_path, opt_sE, opt_wE, opt_totE, init_sE, init_wE, init_totE, opt_sumE, init_sumE, [parm_smooth, parm_weight]
 end

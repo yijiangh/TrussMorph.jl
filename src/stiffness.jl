@@ -211,9 +211,9 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
         U_perm = vcat(U_m, zeros(sys_dof - n_dof_free))
 
         # # compliance
-        if opt_compliance
-            return F_perm_m' * U_m
-        end
+        # if opt_compliance
+        #     return F_perm_m' * U_m
+        # end
 
         U = perm' * U_perm
 

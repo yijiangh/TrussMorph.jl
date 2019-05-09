@@ -1,10 +1,10 @@
 using Makie
 
-function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, area::Vector{Float64}; line_width::Float64=10.0, draw_supp::Bool=true, supp_scale::Float64=0.1, color=:black)
+function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, area::Vector{Float64}; line_width::Float64=10.0, draw_supp::Bool=true, supp_scale::Float64=0.1, color=:black, xaxis_label="x")
 
     @assert(size(T, 1) == length(area))
     a = reshape([area area]', 2*length(area))
-    a ./= maximum(a)
+    # a ./= maximum(a)
     a .*= line_width
 
     # seg_ids = reshape([T[:,1] T[:,2]], length(T[:,1])+length(T[:,2]))
@@ -18,9 +18,10 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
     linesegments!(scene, X[seg_ids, 1], X[seg_ids, 2], linewidth = a,
                   color = color,
                   limits = limits,
-                  axis = (names = (axisnames = ("x", "y"),),
+                  axis = (names = (axisnames = (xaxis_label, "y"),),
                           grid = (linewidth = (1, 1),),
-                          ))
+                          )
+                  )
     if draw_supp
         fix_ids = (Int).(S[:,1])
         # arrows!(scene,
@@ -66,7 +67,8 @@ function draw_deformed!(scene, truss::Truss, U::Vector{Float64}, node_dof::Int;
                   linewidth = a,
                   color = :blue,
                   limits = limits,
-                  axis = (names = (axisnames = ("x", "y"),),
-                          grid = (linewidth = (1, 1),),
-                          ))
+                  # axis = (names = (axisnames = ("x", "y"),),
+                  #         grid = (linewidth = (1, 1),),
+                  #         )
+                          )
 end

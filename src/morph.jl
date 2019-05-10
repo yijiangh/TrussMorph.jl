@@ -3,7 +3,7 @@ tm = TrussMorph
 using Optim
 
 function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
-    node_dof::Int, full_node_dof::Int, design_var_ids::Vector{Int}; path_disc::Int=5, parm_smooth::Float64=100.0, parm_weight::Float64=50.0)
+    node_dof::Int, full_node_dof::Int, design_var_ids::Vector{Int}; path_disc::Int=5, parm_smooth::Float64=100.0, parm_weight::Float64=50.0, do_opt::Bool=true)
 
     @assert(size(t0.X, 1) == size(t1.X, 1))
     @assert(t0.T == t1.T)
@@ -47,14 +47,18 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
         # TODO: try compliance
     end
 
-    # run opt
-    res = Optim.optimize(path_energy, Xpath0, LBFGS())
-    @show summary(res)
-    X_var_star_vec = Optim.minimizer(res)
-    @show opt_sumE = Optim.minimum(res)
-
-    # X_var_star = Xpath0
     @show init_sumE = path_energy(Xpath0)
+    opt_sumE = init_sumE
+
+    # run opt
+    if do_opt
+        res = Optim.optimize(path_energy, Xpath0, LBFGS())
+        @show summary(res)
+        X_var_star_vec = Optim.minimizer(res)
+        @show opt_sumE = Optim.minimum(res)
+    else
+        X_var_star_vec = Xpath0
+    end
 
     X_var_star = reshape(X_var_star_vec, (var_chuck, path_disc))'
     X_var_init = reshape(Xpath0, (var_chuck, path_disc))'
@@ -98,7 +102,7 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
         ptwise_smoothness_energy = Float64[]
         ptwise_weight_energy = Float64[]
         ptwise_total_energy = Float64[]
-        push!(ptwise_smoothness_energy, sum((X0_var - X_var[1,:]).^2))
+        push!(ptwise_smoothness_energy, 0.5 * sum((X0_var - X_var[1,:]).^2))
         push!(ptwise_weight_energy, weight_fn(X0_var))
         push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
                                    parm_weight * ptwise_weight_energy[end])
@@ -115,13 +119,11 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
             else
                 nextX_var = X_var[i+1,:]
             end
-            push!(ptwise_smoothness_energy, sum((X_var[i, :] - prevX_var).^2) +
-                                            sum((X_var[i, :] - nextX_var).^2))
-            push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
-                                       parm_weight * ptwise_weight_energy[end])
+            push!(ptwise_smoothness_energy, 0.5 * (sum((X_var[i, :] - prevX_var).^2) + sum((X_var[i, :] - nextX_var).^2)))
+            push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] + parm_weight * ptwise_weight_energy[end])
         end
 
-        push!(ptwise_smoothness_energy, sum((X1_var - X_var[end,:]).^2))
+        push!(ptwise_smoothness_energy, 0.5 * sum((X1_var - X_var[end,:]).^2))
         push!(ptwise_weight_energy, weight_fn(X1_var))
         push!(ptwise_total_energy, parm_smooth * ptwise_smoothness_energy[end] +
                                    parm_weight * ptwise_weight_energy[end])

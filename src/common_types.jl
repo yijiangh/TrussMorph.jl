@@ -1,5 +1,6 @@
 
 mutable struct MaterialProperties
+    name::String
     E::Float64 # Young's modulus
     G::Float64 # Shear Modulus
     μ::Float64 # Poisson ratio

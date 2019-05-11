@@ -41,7 +41,7 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
         for i=1:path_disc
             path_weight += weight_fn(Xmat[1+i,:])
         end
-        return parm_smooth * sum(dXpath_dt.^2) + parm_weight * path_weight
+        return parm_smooth * sum(dXpath_dt.^4) + parm_weight * path_weight
         # return path_weight
         # return sum(dXpath_dt.^2)
         # TODO: try compliance
@@ -55,7 +55,8 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
         res = Optim.optimize(path_energy, Xpath0, LBFGS())
         @show summary(res)
         X_var_star_vec = Optim.minimizer(res)
-        @show opt_sumE = Optim.minimum(res)
+        opt_sumE = Optim.minimum(res)
+        @show opt_sumE
     else
         X_var_star_vec = Xpath0
     end

@@ -4,7 +4,7 @@ using Test
 using Makie
 using Colors
 
-recompute = false
+recompute = true
 plot = true
 node_dof = 3 # 2 for truss model, 3 for frames
 full_node_dof = 3 # fixed for 2D cases
@@ -21,17 +21,17 @@ result_file_dir = joinpath(pwd(),"test","results")
 # full_design_var_ids = reshape(full_design_var_ids, (2, Int.(length(full_design_var_ids) / 2)))'
 # design_var_ids = full_design_var_ids[:,2]
 
-st_file_name  = "2D_truss.json"
-end_file_name  = "2D_truss_1.json"
+st_file_name  = "2D_truss_1.json"
+end_file_name  = "2D_truss.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
 load_fp = joinpath(dir, "2D_truss_load_case.json")
 design_var_ids = [4, 6]
 # design_var_ids = [3, 4, 5, 6]
 
-path_disc = 3
+path_disc = 20
 parm_weight = 1.0
-parm_smooth = 200.0
+parm_smooth = 1000.0
 
 t0,_ = parse_truss_json(fp0)
 t1,_ = parse_truss_json(fp1)
@@ -68,7 +68,7 @@ if !recompute
             parm = [morph_data["smooth_parameter"], morph_data["weight_parameter"]]
             opt_sumE = morph_data["sum_energy"]
         end
-
+        @show opt_sumE
         # @show parsed_morph_path
     end
 end

@@ -30,7 +30,19 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
         #       vcat(truss.S[:,2], zeros(size(truss.S,1))).*supp_scale,
         #       vcat(zeros(size(truss.S,1)), truss.S[:,3]).*supp_scale,
         #       linecolor = :green, arrowcolor = :green)
-        scatter!(scene, X[fix_ids, 1], X[fix_ids, 2], color = :green, limits = limits, markersize=supp_scale)
+        for i=1:size(S,1)
+            if 1 == S[i,2]
+                arrows!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], [supp_scale], [0], linecolor = :green, arrowcolor = :green, limits = limits)
+            end
+            if 1 == S[i,3]
+                arrows!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], [0], [supp_scale], linecolor = :green, arrowcolor = :green, limits = limits)
+            end
+            if 1 == S[i,4]
+                scatter!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], color = :green, limits = limits, markersize=supp_scale, marker=:x)
+            else
+                scatter!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], color = :green, limits = limits, markersize=supp_scale, marker=:circle)
+            end
+        end
     end
     return scene
 end
@@ -44,7 +56,7 @@ function draw_load!(scene, X::Matrix{Float64}, load::Matrix{Float64}; load_scale
                    max_lim, max_lim)
     arrows!(scene, X[fix_ids, 1], X[fix_ids, 2],
             load[:,2].*load_scale, load[:,3].*load_scale,
-            linecolor = :pink, arrowcolor = :pink, limits = limits,
+            linecolor = :orange, arrowcolor = :orange, limits = limits,
             axis = (names = (axisnames = (xaxis_label, "y"),),)
             )
 end

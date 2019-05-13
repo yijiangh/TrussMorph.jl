@@ -232,6 +232,12 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
             if 2 == node_dof
                 weight += abs(eF[e,:][1])/(pi * r[e]^2) * eL
             else
+                # axial force only
+                # weight += abs(eF[e,:][1])/(pi * r[e]^2) * eL
+
+                # moment only
+                # weight += (abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
+                
                 # M / S + P / A
                 weight += (abs(eF[e,:][1])/(pi * r[e]^2) + abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
             end

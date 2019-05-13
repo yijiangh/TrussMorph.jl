@@ -21,17 +21,24 @@ result_file_dir = joinpath(pwd(),"test","results")
 # full_design_var_ids = reshape(full_design_var_ids, (2, Int.(length(full_design_var_ids) / 2)))'
 # design_var_ids = full_design_var_ids[:,2]
 
-st_file_name  = "2D_truss_1.json"
-end_file_name  = "2D_truss.json"
+st_file_name  = "funicular_arch.json"
+end_file_name  = "funicular_cable.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
-load_fp = joinpath(dir, "2D_truss_load_case.json")
-design_var_ids = [4, 6]
+load_fp = joinpath(dir, "funicular_arch_load_case.json")
+design_var_ids = collect(4:2:20)
+
+# st_file_name  = "2D_truss.json"
+# end_file_name  = "2D_truss_3.json"
+# fp0 = joinpath(dir, st_file_name)
+# fp1 = joinpath(dir, end_file_name)
+# load_fp = joinpath(dir, "2D_truss_load_case.json")
+# design_var_ids = [4, 6]
 # design_var_ids = [3, 4, 5, 6]
 
 path_disc = 20
 parm_weight = 1.0
-parm_smooth = 1000.0
+parm_smooth = 1e5
 
 t0,_ = parse_truss_json(fp0)
 t1,_ = parse_truss_json(fp1)

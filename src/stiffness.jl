@@ -111,7 +111,7 @@ function assemble_global_stiffness_matrix(X::Matrix{Float64}, T::Matrix{Int64},
         end
 
         K_Ge = R[ex_id, xy_id]' * K_le[ex_id, ex_id] * R[ex_id, xy_id]
-        KR_es[e] = K_le * R[ex_id, xy_id]
+        KR_es[e] = K_le[ex_id, ex_id] * R[ex_id, xy_id]
 
         for i=1:2*node_dof
             for j=1:2*node_dof
@@ -189,12 +189,11 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
     # @show design_var_id_map
 
     function calc_weight(X_var::Vector{Float64})
-        X_new = copy(X_template) #this is bad
         for i=1:length(design_var_id)
-            X_new[design_var_id_map[i,1], design_var_id_map[i,2]] = X_var[i]
+            X_template[design_var_id_map[i,1], design_var_id_map[i,2]] = X_var[i]
         end
 
-        K, KR_es, id_map = assemble_global_stiffness_matrix(X_new, T, r, mp, node_dof, full_node_dof)
+        K, KR_es, id_map = assemble_global_stiffness_matrix(X_template, T, r, mp, node_dof, full_node_dof)
         K_perm = perm * K * perm'
         K_mm = K_perm[1:n_dof_free, 1:n_dof_free]
 
@@ -229,8 +228,13 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
         eF = zeros(n_e, e_react_dof*2)
         for e=1:n_e
             eF[e,:] = KR_es[e] * U[id_map[e,:]]
-            eL = norm(X_new[T[e,1], :] - X_new[T[e,2], :])
-            weight += abs(eF[e,:][1]) * eL
+            eL = norm(X_template[T[e,1], :] - X_template[T[e,2], :])
+            if 2 == node_dof
+                weight += abs(eF[e,:][1])/(pi * r[e]^2) * eL
+            else
+                # M / S + P / A
+                weight += (abs(eF[e,:][1])/(pi * r[e]^2) + abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
+            end
         end
         # @show eF
         # @show U

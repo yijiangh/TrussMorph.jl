@@ -30,7 +30,7 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
         #       vcat(truss.S[:,2], zeros(size(truss.S,1))).*supp_scale,
         #       vcat(zeros(size(truss.S,1)), truss.S[:,3]).*supp_scale,
         #       linecolor = :green, arrowcolor = :green)
-        scatter!(scene, X[fix_ids, 1], X[fix_ids, 2], color = :green, limits = limits)
+        scatter!(scene, X[fix_ids, 1], X[fix_ids, 2], color = :green, limits = limits, markersize=supp_scale)
     end
     return scene
 end

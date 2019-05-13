@@ -4,6 +4,7 @@ using Test
 using Makie
 using Colors
 using Dates
+using Printf
 
 recompute = false
 plot = true
@@ -51,6 +52,7 @@ parm_smooth = 1e5
 
 load_scale = 0.1
 line_width = 4.0
+supp_scale = 0.3
 
 t0,_ = parse_truss_json(fp0)
 t1,_ = parse_truss_json(fp1)
@@ -108,9 +110,9 @@ if plot
         mcolor = Float32.((plen - i) / plen) * RGBAf0(1.0,0.0,0.0,0.1) + Float32.(i / plen) * RGBAf0(0.0,0.0,1.0,1)
         color_array[i] = mcolor
 
-        tm.draw_truss!(scene, morph_path[i], t0.T, t0.S, r, supp_scale=0.2, color=mcolor, xaxis_label="x - OPT", line_width=line_width)
+        tm.draw_truss!(scene, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=mcolor, xaxis_label="x - OPT", line_width=line_width)
 
-        tm.draw_truss!(init_scene, init_morph_path[i], t0.T, t0.S, r, supp_scale=0.2, color=mcolor, xaxis_label="x - INIT(linear)", line_width=line_width)
+        tm.draw_truss!(init_scene, init_morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=mcolor, xaxis_label="x - INIT(linear)", line_width=line_width)
         # display(scene)
         # sleep(0.2)
     end
@@ -164,10 +166,10 @@ if plot
 
     Makie.save(joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".png"), scene_final)
 
+    anim_sc = Scene()
     # save morph gif
-    # anim_sc = Scene()
     # record(anim_sc, joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".gif"), 1:plen) do i
-    #     tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=0.2, color=color_array[i], xaxis_label="x - OPT", line_width)
+    #     tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=color_array[i], xaxis_label="x - OPT", line_width)
     #     display(anim_sc)
     #     sleep(1)
     # end
@@ -179,11 +181,13 @@ if plot
         mcolor = Float32.((plen - i) / plen) * RGBAf0(1.0,0.0,0.0,1) + Float32.(i / plen) * RGBAf0(0.0,0.0,1.0,1)
 
         tm.draw_load!(anim_sc, morph_path[i], load, load_scale=load_scale, xaxis_label="x - OPT")
-        tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=0.2, xaxis_label="x - OPT", color = mcolor, line_width=line_width)
+        tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, xaxis_label="x - OPT", color = mcolor, line_width=line_width)
+
+        result_img_name = result_file_name * string("_", @sprintf("%03d",i),"-",plen) * ".png"
+        Makie.save(joinpath(f_file_dir, result_img_name), anim_sc)
 
         display(anim_sc)
-        sleep(0.5)
+        sleep(0.1)
     end
-
 
 end

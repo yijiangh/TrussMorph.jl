@@ -1,16 +1,16 @@
 using TrussMorph
 tm = TrussMorph
 using Optim
+using Printf
 
 function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
-    node_dof::Int, full_node_dof::Int, design_var_ids::Vector{Int}; path_disc::Int=5, parm_smooth::Float64=100.0, parm_weight::Float64=50.0, do_opt::Bool=true)
+    node_dof::Int, full_node_dof::Int, design_var_ids::Vector{Int}; path_disc::Int=5, parm_smooth::Float64=100.0, parm_weight::Float64=50.0, do_opt::Bool=true, kwargs...)
 
     @assert(size(t0.X, 1) == size(t1.X, 1))
     @assert(t0.T == t1.T)
 
     n_v = size(t0.X,1)
     n_e = size(t0.T,1)
-
     # initial cross secs
     r = ones(size(t0.T,1)) * 0.01
     F = tm.assemble_load_vector(load, n_v, node_dof)
@@ -23,6 +23,7 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
     X0_var = reshape(t0.X', prod(size(t0.X)))[design_var_ids]
     X1_var = reshape(t1.X', prod(size(t1.X)))[design_var_ids]
 
+    # TODO: symmetric variable
     weight_fn = tm.get_weight_calculation_fn(t0.X, r, t0.T, F_m, perm, n_dof_free,
     node_dof, full_node_dof, t0.mp, design_var_ids)
 
@@ -52,8 +53,32 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
 
     # run opt
     if do_opt
-        res = Optim.optimize(path_energy, Xpath0, LBFGS())
-        @show summary(res)
+        if :box_constraint in keys(kwargs) && kwargs[:box_constraint] != undef
+            bc_var = kwargs[:box_constraint]
+            @assert(size(bc_var, 1) == length(design_var_ids))
+            @assert(size(bc_var, 2) == 2)
+            println("using box constraint...")
+
+            Xpath_bc_lower = reshape(bc_var[:,1] * ones(path_disc)', path_disc * var_chuck)
+            Xpath_bc_upper = reshape(bc_var[:,2] * ones(path_disc)', path_disc * var_chuck)
+            # @assert(length(Xpath_bc_lower) == length(Xpath0))
+            # @assert(length(Xpath_bc_upper) == length(Xpath0))
+
+            # inner_optimizer = GradientDescent()
+            # res = Optim.optimize(path_energy, box_constraint[:,1], box_constraint[:,2], Xpath0, Fminbox(inner_optimizer))
+            res = Optim.optimize(path_energy, Xpath_bc_lower, Xpath_bc_upper, Xpath0)
+        else
+            println("unconstrained...")
+            # Optim constructs an approximate gradient for us using central finite differencing
+            res = Optim.optimize(path_energy, Xpath0, LBFGS())
+        end
+
+        @show Optim.summary(res)
+        @show Optim.iterations(res)
+        @show Optim.iteration_limit_reached(res)
+        @show Optim.f_calls(res)
+        @show Optim.converged(res)
+
         X_var_star_vec = Optim.minimizer(res)
         opt_sumE = Optim.minimum(res)
         @show opt_sumE

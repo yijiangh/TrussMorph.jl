@@ -6,10 +6,11 @@ using Colors
 using Dates
 using Printf
 
-recompute = false
+recompute = true
 plot = true
 node_dof = 3 # 2 for truss model, 3 for frames
 full_node_dof = 3 # fixed for 2D cases
+box_constr = undef
 
 dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/gh_validation"
 result_file_dir = joinpath(pwd(),"test","results")
@@ -30,26 +31,31 @@ result_file_dir = joinpath(pwd(),"test","results")
 # load_fp = joinpath(dir, "funicular_arch_load_case.json")
 # design_var_ids = collect(4:2:20)
 
-# st_file_name  = "2D_truss_0.json"
-# end_file_name  = "2D_truss_1.json"
-# fp0 = joinpath(dir, st_file_name)
-# fp1 = joinpath(dir, end_file_name)
-# load_fp = joinpath(dir, "2D_truss_0_load_case.json")
-# # design_var_ids = [4, 6]
-# design_var_ids = [3, 4, 5, 6]
-
-st_file_name  = "cm_truss_0.json"
-end_file_name  = "cm_truss_1.json"
+st_file_name  = "2D_truss_0.json"
+end_file_name  = "2D_truss_1.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
-load_fp = joinpath(dir, "cm_truss_0_load_case.json")
-design_var_ids = [4, 6, 8]
+load_fp = joinpath(dir, "2D_truss_0_load_case.json")
+design_var_ids = [4, 6]
+# design_var_ids = [3, 4, 5, 6]
+
+# st_file_name  = "cm_truss_0.json"
+# end_file_name  = "cm_truss_1.json"
+# fp0 = joinpath(dir, st_file_name)
+# fp1 = joinpath(dir, end_file_name)
+# load_fp = joinpath(dir, "cm_truss_0_load_case.json")
+# # design_var_ids = [4, 6, 8]
 # design_var_ids = [3, 4, 6, 7, 8]
+# X0_var = reshape(t0.X', prod(size(t0.X)))[design_var_ids]
+# X1_var = reshape(t1.X', prod(size(t1.X)))[design_var_ids]
+# box_constr = [0.2 3; -5 5; -5 5; 3 5.7; -5 5]
+# box_constr += hcat(X0_var, X0_var)
 
-path_disc = 15
+path_disc = 20
 parm_weight = 1.0
-parm_smooth = 1e5
+parm_smooth = 1e7
 
+# plot parameters
 load_scale = 0.1
 line_width = 4.0
 supp_scale = 0.3
@@ -59,7 +65,7 @@ t1,_ = parse_truss_json(fp1)
 load = parse_load_json(load_fp, node_dof)
 
 morph_path, init_morph_path, opt_sE, opt_wE, opt_totE, init_sE, init_wE, init_totE, opt_sumE, init_sumE, parm =
-    tm.compute_morph_path(t0, t1, load, node_dof, full_node_dof, design_var_ids, path_disc=path_disc,parm_smooth=parm_smooth, parm_weight=parm_weight, do_opt=recompute)
+    tm.compute_morph_path(t0, t1, load, node_dof, full_node_dof, design_var_ids, path_disc=path_disc,parm_smooth=parm_smooth, parm_weight=parm_weight, do_opt=recompute, box_constraint=box_constr)
 
 pure_st_file_name = SubString(st_file_name, 1:length(st_file_name)-length(".json"))
 pure_end_file_name = SubString(end_file_name, 1:length(end_file_name)-length(".json"))
@@ -162,8 +168,6 @@ if plot
         vbox(scene, init_scene)
         )
 
-    display(scene_final)
-
     Makie.save(joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".png"), scene_final)
 
     anim_sc = Scene()
@@ -189,5 +193,7 @@ if plot
         display(anim_sc)
         sleep(0.1)
     end
+
+    display(scene_final)
 
 end

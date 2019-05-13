@@ -14,14 +14,14 @@ full_node_dof = 3 # fixed for 2D cases
 dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/gh_validation"
 result_file_dir = joinpath(pwd(),"test","results")
 
-st_file_name  = "2D_truss.json"
+st_file_name  = "2D_truss_0.json"
 end_file_name  = "2D_truss_1.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
-load_fp = joinpath(dir, "2D_truss_load_case.json")
+load_fp = joinpath(dir, "2D_truss_0_load_case.json")
 design_var_ids = [4, 6]
 
-path_disc = 20
+path_disc = 15
 
 t0,_ = parse_truss_json(fp0)
 t1,_ = parse_truss_json(fp1)

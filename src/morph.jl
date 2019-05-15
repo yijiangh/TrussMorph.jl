@@ -35,6 +35,14 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
             Float64.(i / (path_disc + 1)) * X1_var
     end
 
+    L_I = collect(1:path_disc+1)
+    L_J = collect(2:path_disc+2)
+    L_V = ones(Float64, path_disc+1)
+    L = sparse(L_I, L_J, L_V, path_disc+2, path_disc+2)
+    L = L + L'
+    rowsums = vec(sum(L,dims=2))
+    L = L - spdiagm(0 => rowsums)
+
     function path_energy(Xpath::Vector{Float64})
         Xmat = vcat(X0_var', reshape(Xpath, (var_chuck, path_disc))', X1_var')
         dXpath_dt = Xmat[2:end, :] - Xmat[1:end-1, :]
@@ -42,10 +50,24 @@ function compute_morph_path(t0::tm.Truss, t1::tm.Truss, load::Matrix{Float64},
         for i=1:path_disc
             path_weight += weight_fn(Xmat[1+i,:])
         end
-        return parm_smooth * sum(dXpath_dt.^2) + parm_weight * path_weight
-        # return path_weight
-        # return sum(dXpath_dt.^2)
-        # TODO: try compliance
+        path_weight_vec = zeros(Float64, size(Xmat, 1))
+        for i=1:size(Xmat, 1)
+            path_weight_vec[i] = weight_fn(Xmat[i,:])
+        end
+        # ddt = (L * path_weight_vec).^2
+
+        # ∑ |dϕ/dt|^2 + |dWF/dt|^2
+        return parm_smooth * sum(dXpath_dt.^2) + parm_weight * sum((path_weight_vec[2:end] - path_weight_vec[1:end-1]).^2)
+
+        # ∑ |dWF/dt|^2
+        # return sum((path_weight_vec[2:end] - path_weight_vec[1:end-1]).^2)
+
+        # ∑ |d^2WF/dt^2|^2
+        # return sum(ddt[2:end-1])
+        # return sum(ddt)
+
+        # ∑ |dϕ/dt|^2 + |WF(X(t))|
+        # return parm_smooth * sum(dXpath_dt.^2) + parm_weight * path_weight
     end
 
     @show init_sumE = path_energy(Xpath0)

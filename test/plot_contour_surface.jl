@@ -14,14 +14,16 @@ full_node_dof = 3 # fixed for 2D cases
 dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/gh_validation"
 result_file_dir = joinpath(pwd(),"test","results")
 
-st_file_name  = "2D_truss_0.json"
-end_file_name  = "2D_truss_1.json"
+# st_file_name  = "2D_truss_0.json"
+# end_file_name  = "2D_truss_1.json"
+st_file_name  = "2D_truss_4.json"
+end_file_name  = "2D_truss_5.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
 load_fp = joinpath(dir, "2D_truss_0_load_case.json")
 design_var_ids = [4, 6]
 
-path_disc = 15
+path_disc = 20
 
 t0,_ = parse_truss_json(fp0)
 t1,_ = parse_truss_json(fp1)
@@ -90,15 +92,15 @@ if parse_result
 end
 
 sc = Scene()
-y1 = -1.2:0.01:1.2
-y2 = -1.2:0.01:1.2
+y1 = -1.2:0.005:1.2
+y2 = -1.2:0.005:1.2
 wF(x, y) = log(1 + weight_fn([x,y]))
 # wF(x, y) = weight_fn([x,y])
 
 p1 = surface!(sc, y1, y2, wF, transparency = parse_result)
 
-# z = Float64[wF(x, y) for x in y1, y in y2]
-# wireframe!(sc, y1, y2, z)
+z = Float64[wF(x, y) for x in y1, y in y2]
+scatter!(sc, y1, y2, z, color=:blue, markersize=0.01)
 
 if parse_result
     morph_weight = zeros(length(morph_path))
@@ -110,9 +112,17 @@ if parse_result
     scatter!(sc, pts, color=:red, markersize=0.08)
     poly_vec = pts[2:end] - pts[1:end-1]
     push!(poly_vec, [0,0,0])
-    arrows!(sc, pts, poly_vec, arrowsize = 0.04, linewidth = 1)
+    arrows!(sc, pts, poly_vec, arrowsize = 0.08, linewidth = 1.5)
 end
 
 # contour3d!(sc, y1, y2, (x, y) -> f(x,y), levels = 15, linewidth = 3)
 
+result_file_dir = joinpath(pwd(),"test","results")
+pure_st_file_name = SubString(st_file_name, 1:length(st_file_name)-length(".json"))
+pure_end_file_name = SubString(end_file_name, 1:length(end_file_name)-length(".json"))
+result_file_name = pure_st_file_name * "-" *  pure_end_file_name
+f_file_dir = joinpath(result_file_dir, result_file_name)
+
+result_img_name = result_file_name * "_weight_surface_" * string(Dates.now()) * ".png"
+Makie.save(joinpath(f_file_dir, result_img_name), sc)
 display(sc)

@@ -169,7 +169,7 @@ function dof_permutation(S::Matrix{Int}, n_nodes::Int, node_dof::Int)
 end
 
 function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, T::Matrix{Int64},
-    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties, design_var_id::Vector{Int}; opt_compliance::Bool=false)::Function
+    F_perm_m::Vector{Float64}, perm::SparseMatrixCSC{Float64, Int}, n_dof_free::Int, node_dof::Int, full_node_dof::Int, mp::MaterialProperties, design_var_id::Vector{Int}; opt_compliance::Bool=false, kwargs...)::Function
 
     # assemble stiffness matrix
     n_v = size(X_full, 1)
@@ -179,19 +179,30 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
     # split design variable + the rest
     X_template = copy(X_full)
     design_var_id_map = zeros(Int, length(design_var_id), 2)
-    for i=1:length(design_var_id)
-        design_var_id_map[i,1] = Int.((design_var_id[i] + design_var_id[i]%2) / 2)
-        design_var_id_map[i,2] = 2 - design_var_id[i]%2
-        X_template[design_var_id_map[i,1], design_var_id_map[i,2]] = 0
+
+    function id_convert(id::Int)::Vector{Int}
+        return [Int.((id + id%2) / 2), 2 - id%2]
     end
-    # @show design_var_id
-    # @show X_template
-    # @show design_var_id_map
+
+    for i=1:length(design_var_id)
+        design_var_id_map[i,:] = id_convert(design_var_id[i])
+    end
+
+    # sym_var_ids = undef
+    # if :sym_var_ids in keys(kwargs) && kwargs[:sym_var_ids] != undef
+    #     sym_var_ids = kwargs[:sym_var_ids]
+    #     @assert(size(sym_var_ids, 2) == 2)
+    # end
 
     function calc_weight(X_var::Vector{Float64})
         for i=1:length(design_var_id)
-            X_template[design_var_id_map[i,1], design_var_id_map[i,2]] = X_var[i]
+            X_template[id_convert(design_var_id[i])[1], id_convert(design_var_id[i])[2]] = X_var[i]
         end
+        # if sym_var_ids != undef
+        #     for i=1:size(sym_var_ids,1)
+        #         X_template[id_convert(sym_var_ids[i,2])[1], id_convert(sym_var_ids[i,2])[2]] = X_template[id_convert(sym_var_ids[i,1])[1], id_convert(sym_var_ids[i,1])[2]]
+        #     end
+        # end
 
         K, KR_es, id_map = assemble_global_stiffness_matrix(X_template, T, r, mp, node_dof, full_node_dof)
         K_perm = perm * K * perm'
@@ -230,16 +241,17 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
             eF[e,:] = KR_es[e] * U[id_map[e,:]]
             eL = norm(X_template[T[e,1], :] - X_template[T[e,2], :])
             if 2 == node_dof
-                weight += abs(eF[e,:][1])/(pi * r[e]^2) * eL
+                weight += abs(eF[e,:][1]) * eL
             else
                 # axial force only
-                # weight += abs(eF[e,:][1])/(pi * r[e]^2) * eL
+                # weight += abs(eF[e,:][1]) * eL
 
                 # moment only
-                # weight += (abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
-                
-                # M / S + P / A
-                weight += (abs(eF[e,:][1])/(pi * r[e]^2) + abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
+                # weight += 4*max(abs(eF[e,:][3]), abs(eF[e,:][6]))/r[e]) * eL
+
+                # 4M / r + F
+                weight += (abs(eF[e,:][1]) + 4*max(abs(eF[e,:][3]), abs(eF[e,:][6]))/r[e]) * eL
+                # weight += (abs(eF[e,:][1])/(pi * r[e]^2) + abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
             end
         end
         # @show eF

@@ -3,8 +3,6 @@ tm = TrussMorph
 using Test
 using Makie
 using Colors
-# using ForwardDiff
-# using ReverseDiff
 
 parse_result = true
 
@@ -12,12 +10,13 @@ node_dof = 3 # 2 for truss model, 3 for frames
 full_node_dof = 3 # fixed for 2D cases
 
 dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/gh_validation"
-result_file_dir = joinpath(pwd(),"test","results")
+# result_file_dir = joinpath(pwd(),"test","results")
+result_file_dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/results"
 
-# st_file_name  = "2D_truss_0.json"
-# end_file_name  = "2D_truss_1.json"
 st_file_name  = "2D_truss_4.json"
 end_file_name  = "2D_truss_5.json"
+# st_file_name  = "2D_truss_0.json"
+# end_file_name  = "2D_truss_1.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
 load_fp = joinpath(dir, "2D_truss_0_load_case.json")
@@ -94,28 +93,42 @@ end
 sc = Scene()
 y1 = -1.2:0.005:1.2
 y2 = -1.2:0.005:1.2
-wF(x, y) = log(1 + weight_fn([x,y]))
+# y1 = -1.2:0.01:1.2
+# y2 = -1.2:0.01:1.2
+wF(x, y) = log(weight_fn([x,y]))
 # wF(x, y) = weight_fn([x,y])
 
-p1 = surface!(sc, y1, y2, wF, transparency = parse_result)
+plot_alpha = 0.2
+surface!(sc, y1, y2, wF, shading=false)
+# , colormap=[RGBAf0(0,0,1,plot_alpha), RGBAf0(1, 1, 0, plot_alpha)]
 
-z = Float64[wF(x, y) for x in y1, y in y2]
-scatter!(sc, y1, y2, z, color=:blue, markersize=0.01)
+# z = Float64[wF(x, y) for x in y1, y in y2]
+# scatter!(sc, y1, y2, z, color=:blue, markersize=0.01)
 
 if parse_result
     morph_weight = zeros(length(morph_path))
+    color_array = Array{RGBAf0}(undef, plen)
     for i = 1:length(morph_path)
         morph_weight[i] = wF(morph_var_path[i,1], morph_var_path[i,2])
+        mcolor = Float32.((length(morph_path) - i) / length(morph_path)) * RGBAf0(1.0,0.0,0.0,1) + Float32.(i / length(morph_path)) * RGBAf0(0.0,0.0,1.0,1)
+        color_array[i] = mcolor
     end
 
     pts = vec(Point3f0.(morph_var_path[:,1], morph_var_path[:,2], morph_weight))
-    scatter!(sc, pts, color=:red, markersize=0.08)
+    scatter!(sc, pts, color=color_array, markersize=0.05)
     poly_vec = pts[2:end] - pts[1:end-1]
     push!(poly_vec, [0,0,0])
-    arrows!(sc, pts, poly_vec, arrowsize = 0.08, linewidth = 1.5)
+
+    arrows!(sc, pts, poly_vec, arrowsize = 0.03, linewidth = 3, linecolor = color_array, arrowcolor = color_array)
 end
 
-# contour3d!(sc, y1, y2, (x, y) -> f(x,y), levels = 15, linewidth = 3)
+contour3d!(sc, y1, y2, (x, y) -> wF(x,y), levels = 15, linewidth = 3, color=RGBAf0(1,1,1,0.2))
+
+axis = sc[Axis]
+axis[:names][:axisnames] = ("y1", "y2", "log(weight)")
+axis[:showaxis] = false
+# axis[:showgrid] = (false, false, false)
+display(sc)
 
 result_file_dir = joinpath(pwd(),"test","results")
 pure_st_file_name = SubString(st_file_name, 1:length(st_file_name)-length(".json"))
@@ -124,5 +137,6 @@ result_file_name = pure_st_file_name * "-" *  pure_end_file_name
 f_file_dir = joinpath(result_file_dir, result_file_name)
 
 result_img_name = result_file_name * "_weight_surface_" * string(Dates.now()) * ".png"
-Makie.save(joinpath(f_file_dir, result_img_name), sc)
-display(sc)
+
+# result_file_dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/results"
+# Makie.save(joinpath(result_file_dir, result_img_name), sc)

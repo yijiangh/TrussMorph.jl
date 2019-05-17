@@ -14,7 +14,8 @@ box_constr = undef
 sym_var_ids = undef
 
 dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/gh_validation"
-result_file_dir = joinpath(pwd(),"test","results")
+# result_file_dir = joinpath(pwd(),"test","results")
+result_file_dir = "/Users/yijiangh/Dropbox (MIT)/Course_Work/6.838_2019_spring/final_project/code/results"
 
 # st_file_name  = "wiggle_truss_min_d.json"
 # end_file_name  = "wiggle_truss_min_w.json"
@@ -34,6 +35,8 @@ result_file_dir = joinpath(pwd(),"test","results")
 
 st_file_name  = "2D_truss_4.json"
 end_file_name  = "2D_truss_5.json"
+# st_file_name  = "2D_truss_0.json"
+# end_file_name  = "2D_truss_1.json"
 fp0 = joinpath(dir, st_file_name)
 fp1 = joinpath(dir, end_file_name)
 load_fp = joinpath(dir, "2D_truss_0_load_case.json")
@@ -44,23 +47,22 @@ design_var_ids = [4, 6]
 # end_file_name  = "cm_truss_1.json"
 # fp0 = joinpath(dir, st_file_name)
 # fp1 = joinpath(dir, end_file_name)
-# load_fp = joinpath(dir, "cm_truss_2pts_uneven_load_case.json")
-# # cm_truss_2pts_load_case.json
-# # cm_truss_0_load_case.json
+# # load_fp = joinpath(dir, "cm_truss_2pts_uneven_load_case.json")
+# # load_fp = joinpath(dir, "cm_truss_0_load_case.json")
+# load_fp = joinpath(dir, "cm_truss_2pts_load_case.json")
 # # design_var_ids = [4, 6, 8]
 # design_var_ids = [3, 4, 6, 7, 8]
-# X0_var = reshape(t0.X', prod(size(t0.X)))[design_var_ids]
-# X1_var = reshape(t1.X', prod(size(t1.X)))[design_var_ids]
-# box_constr = [1.0 3; -5 5; -5 5; 3.0 5; -5 5]
+# # box_constr = [1.0 3; -5 5; -5 5; 3.0 5; -5 5]
 
 path_disc = 20
 parm_weight = 1.0
-parm_smooth = 1e8
+parm_smooth = 1e4
+# parm_smooth = 1e4
 
 # plot parameters
-load_scale = 0.05
+load_scale = 0.01
+supp_scale = 0.1
 line_width = 4.0
-supp_scale = 0.3
 
 t0,_ = parse_truss_json(fp0)
 t1,_ = parse_truss_json(fp1)
@@ -107,22 +109,32 @@ else
 end
 
 if plot
-    scene = Scene()
-    init_scene= Scene()
-    tm.draw_load!(scene, t0.X, load, load_scale=load_scale, xaxis_label="x - OPT")
-    tm.draw_load!(init_scene, t0.X, load, load_scale=load_scale, xaxis_label="x - INIT(linear)")
-
     plen = length(morph_path)
     r = ones(Float64, size(t0.T,1)) * 0.5
     color_array = Array{RGBAf0}(undef, plen)
+
+    max_x = maximum([maximum(M[:,1]) for M in morph_path])
+    min_x = minimum([minimum(M[:,1]) for M in morph_path])
+    max_y = maximum([maximum(M[:,2]) for M in morph_path])
+    min_y = minimum([minimum(M[:,2]) for M in morph_path])
+    max_xlim = max_x - min_x
+    max_ylim = max_y - min_y
+    max_lim = max(max_xlim, max_ylim)
+    limits = FRect(min_x, min_y,
+                   max_xlim, max_ylim)
+
+    scene = Scene()
+    init_scene= Scene()
+    tm.draw_load!(scene, t0.X, load, load_scale=max_ylim*load_scale, xaxis_label="x - OPT", plot_limits=limits)
+    tm.draw_load!(init_scene, t0.X, load, load_scale=max_ylim*load_scale, xaxis_label="x - INIT(linear)", plot_limits=limits)
 
     for i=1:plen
         mcolor = Float32.((plen - i) / plen) * RGBAf0(1.0,0.0,0.0,0.1) + Float32.(i / plen) * RGBAf0(0.0,0.0,1.0,1)
         color_array[i] = mcolor
 
-        tm.draw_truss!(scene, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=mcolor, xaxis_label="x - OPT", line_width=line_width)
+        tm.draw_truss!(scene, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=mcolor, xaxis_label="x - OPT", line_width=line_width, plot_limits=limits)
 
-        tm.draw_truss!(init_scene, init_morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=mcolor, xaxis_label="x - INIT(linear)", line_width=line_width)
+        tm.draw_truss!(init_scene, init_morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=mcolor, xaxis_label="x - INIT(linear)", line_width=line_width, plot_limits=limits)
         # display(scene)
         # sleep(0.2)
     end
@@ -172,10 +184,13 @@ if plot
         vbox(scene, init_scene)
         )
 
+    # scene_final = scene_sE
+
     Makie.save(joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".png"), scene_final)
 
-    anim_sc = Scene()
-    display(anim_sc)
+    # anim_sc = Scene()
+    # display(anim_sc)
+
     # save morph gif
     # record(anim_sc, joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".gif"), 1:plen) do i
     #     tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, color=color_array[i], xaxis_label="x - OPT", line_width)
@@ -185,16 +200,19 @@ if plot
     # t = Node(i)
     # color=color_array[lift(i->i,t)]
 
-    record(anim_sc, joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".gif"), 1:plen) do i
+    # record(anim_sc, joinpath(f_file_dir, result_file_name * "_" * string(Dates.now()) * ".gif"), 1:plen) do i
+
+
+    for i=1:plen
         anim_sc = Scene()
+        # display(anim_sc)
         mcolor = Float32.((plen - i) / plen) * RGBAf0(1.0,0.0,0.0,1) + Float32.(i / plen) * RGBAf0(0.0,0.0,1.0,1)
 
-        tm.draw_load!(anim_sc, morph_path[i], load, load_scale=load_scale, xaxis_label="x - OPT")
-        tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, xaxis_label="x - OPT", color = mcolor, line_width=line_width)
+        tm.draw_load!(anim_sc, morph_path[i], load, load_scale=max_ylim*load_scale, xaxis_label="x - OPT", plot_limits=limits)
+        tm.draw_truss!(anim_sc, morph_path[i], t0.T, t0.S, r, supp_scale=supp_scale, xaxis_label="x - OPT", color = mcolor, line_width=line_width, plot_limits=limits)
 
         result_img_name = result_file_name * string("_", @sprintf("%03d",i),"-",plen) * ".png"
         Makie.save(joinpath(f_file_dir, result_img_name), anim_sc)
-
         display(anim_sc)
         sleep(0.1)
     end

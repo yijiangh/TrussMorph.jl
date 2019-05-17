@@ -249,8 +249,8 @@ function get_weight_calculation_fn(X_full::Matrix{Float64}, r::Vector{Float64}, 
                 # moment only
                 # weight += 4*max(abs(eF[e,:][3]), abs(eF[e,:][6]))/r[e]) * eL
 
-                # 4M / r + F
-                weight += (abs(eF[e,:][1]) + 4*max(abs(eF[e,:][3]), abs(eF[e,:][6]))/r[e]) * eL
+                # 4M + F
+                weight += (abs(eF[e,:][1]) + 4*max(abs(eF[e,:][3]), abs(eF[e,:][6]))) * eL
                 # weight += (abs(eF[e,:][1])/(pi * r[e]^2) + abs(eF[e,:][3])/(pi * r[e]^3 / 4)) * eL
             end
         end

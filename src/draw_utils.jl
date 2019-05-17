@@ -1,6 +1,6 @@
 using Makie
 
-function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, area::Vector{Float64}; line_width::Float64=1.0, draw_supp::Bool=true, supp_scale::Float64=0.1, color=:black, xaxis_label::String="x")
+function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, area::Vector{Float64}; line_width::Float64=1.0, draw_supp::Bool=true, supp_scale::Float64=0.1, color=:black, xaxis_label::String="x", plot_limits=undef)
 
     @assert(size(T, 1) == length(area))
     a = reshape([area area]', 2*length(area))
@@ -9,15 +9,17 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
 
     # seg_ids = reshape([T[:,1] T[:,2]], length(T[:,1])+length(T[:,2]))
     seg_ids = reshape(T', prod(size(T)))
-    max_xlim = maximum(X[:,1]) - minimum(X[:,1])
-    max_ylim = maximum(X[:,2]) - minimum(X[:,2])
-    max_lim = max(max_xlim, max_ylim)
-    limits = FRect(minimum(X[:,1]), minimum(X[:,2]),
-                   max_lim, max_lim)
+    if plot_limits == undef
+        max_xlim = maximum(X[:,1]) - minimum(X[:,1])
+        max_ylim = maximum(X[:,2]) - minimum(X[:,2])
+        max_lim = max(max_xlim, max_ylim)
+        plot_limits = FRect(minimum(X[:,1]), minimum(X[:,2]),
+                       max_lim, max_lim)
+    end
 
     linesegments!(scene, X[seg_ids, 1], X[seg_ids, 2], linewidth = a,
                   color = color,
-                  limits = limits,
+                  limits = plot_limits,
                   axis = (names = (axisnames = (xaxis_label, "y"),),
                           grid = (linewidth = (1, 1),),
                           )
@@ -32,33 +34,50 @@ function draw_truss!(scene, X::Matrix{Float64}, T::Matrix{Int}, S::Matrix{Int}, 
         #       linecolor = :green, arrowcolor = :green)
         for i=1:size(S,1)
             if 1 == S[i,2]
-                arrows!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], [supp_scale], [0], linecolor = :green, arrowcolor = :green, limits = limits)
+                arrows!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], [supp_scale], [0], linecolor = :green, arrowcolor = :green, limits = plot_limits,
+                # linewidth = supp_scale*10,
+                arrowsize = 0.1,
+                )
             end
             if 1 == S[i,3]
-                arrows!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], [0], [supp_scale], linecolor = :green, arrowcolor = :green, limits = limits)
+                arrows!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], [0], [supp_scale], linecolor = :green, arrowcolor = :green, limits = plot_limits,
+                # linewidth = supp_scale*10,
+                arrowsize = 0.1,
+                )
             end
             if 1 == S[i,4]
-                scatter!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], color = :green, limits = limits, markersize=supp_scale, marker=:x)
+                scatter!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], color = :green, markersize=supp_scale, marker=:x, limits = plot_limits)
             else
-                scatter!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], color = :green, limits = limits, markersize=supp_scale, marker=:circle)
+                scatter!(scene, [X[S[i,1], 1]], [X[S[i,1], 2]], color = :green, markersize=supp_scale, marker=:circle, limits = plot_limits)
             end
         end
     end
+    # axis = scene[Axis]
+    # axis[:grid][:linewidth] = (1, 1)
     return scene
 end
 
-function draw_load!(scene, X::Matrix{Float64}, load::Matrix{Float64}; load_scale::Float64=0.1, xaxis_label::String="x")
+function draw_load!(scene, X::Matrix{Float64}, load::Matrix{Float64}; load_scale::Float64=0.1, xaxis_label::String="x", plot_limits=undef)
     fix_ids = (Int).(load[:,1])
-    max_xlim = maximum(X[:,1]) - minimum(X[:,1])
-    max_ylim = maximum(X[:,2]) - minimum(X[:,2])
-    max_lim = max(max_xlim, max_ylim)
-    limits = FRect(minimum(X[:,1]), minimum(X[:,2]),
-                   max_lim, max_lim)
+
+    if plot_limits == undef
+        max_xlim = maximum(X[:,1]) - minimum(X[:,1])
+        max_ylim = maximum(X[:,2]) - minimum(X[:,2])
+        max_lim = max(max_xlim, max_ylim)
+        plot_limits = FRect(minimum(X[:,1]), minimum(X[:,2]),
+                       max_lim, max_lim)
+    end
+
     arrows!(scene, X[fix_ids, 1], X[fix_ids, 2],
             load[:,2].*load_scale, load[:,3].*load_scale,
-            linecolor = :orange, arrowcolor = :orange, limits = limits,
+            linecolor = :orange, arrowcolor = :orange,
+            # linewidth = load_scale*10,
+            arrowsize = 0.1,
+            limits = plot_limits,
             axis = (names = (axisnames = (xaxis_label, "y"),),)
             )
+    # axis = scene[Axis]
+    # axis[:grid][:linewidth] = (1, 1)
 end
 
 function draw_deformed!(scene, truss::Truss, U::Vector{Float64}, node_dof::Int;
